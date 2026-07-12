@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f2eb" />
+    <meta name="description" content="Ритм — личное пространство для сна, состояния, привычек и планов." />
+    <title>Ритм — личный дневник</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Основная навигация">
+        <a class="brand" href="#today" data-nav="today" aria-label="Ритм, на главную">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span>Ритм</span>
+        </a>
+        <nav class="nav-list">
+          <button class="nav-item active" data-nav="today"><span class="nav-icon">⌂</span><span>Сегодня</span></button>
+          <button class="nav-item" data-nav="journal"><span class="nav-icon">≡</span><span>Дневник</span></button>
+          <button class="nav-item" data-nav="practice"><span class="nav-icon">◒</span><span>Практики</span></button>
+          <button class="nav-item" data-nav="calendar"><span class="nav-icon">□</span><span>План</span></button>
+          <button class="nav-item" data-nav="insights"><span class="nav-icon">✦</span><span>Инсайты</span></button>
+        </nav>
+        <div class="sidebar-foot">
+          <button class="nav-item" data-nav="settings"><span class="nav-icon">◌</span><span>Настройки</span></button>
+          <div class="privacy-note"><span></span> Данные только на этом устройстве</div>
+        </div>
+      </aside>
+      <main id="app" class="main" tabindex="-1"></main>
+      <nav class="bottom-nav" aria-label="Мобильная навигация">
+        <button class="bottom-item active" data-nav="today"><span>⌂</span><small>Сегодня</small></button>
+        <button class="bottom-item" data-nav="journal"><span>≡</span><small>Дневник</small></button>
+        <button class="bottom-item" data-nav="practice"><span>◒</span><small>Практики</small></button>
+        <button class="bottom-item" data-nav="calendar"><span>□</span><small>План</small></button>
+        <button class="bottom-item" data-nav="insights"><span>✦</span><small>Инсайты</small></button>
+      </nav>
+    </div>
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="polite"></div>
+    <input id="import-file" type="file" accept="application/json" hidden />
+    <script src="app.js" defer></script>
+  </body>
+</html>
