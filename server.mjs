@@ -8,6 +8,10 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 const port = Number(process.env.PORT || 4173);
 const apiKey = process.env.OPENAI_API_KEY;
 const model = process.env.RHYTHM_AI_MODEL || 'gpt-5.6-terra';
+const accessToken = process.env.RHYTHM_ACCESS_TOKEN || '';
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = new Set((process.env.RHYTHM_ALLOWED_ORIGINS || 'https://danilapoperekov.github.io,http://localhost:4173,http://127.0.0.1:4173').split(',').map((value) => value.trim()).filter(Boolean));
+const requestWindow = new Map();
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const securityHeaders = {
   'X-Content-Type-Options': 'nosniff',
@@ -22,6 +26,31 @@ const securityHeaders = {
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { ...securityHeaders, 'Content-Type': type, 'Cache-Control': 'no-store' });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
+}
+
+function allowOrigin(req, res) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  if (!allowedOrigins.has(origin)) return false;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  return true;
+}
+
+function authorized(req) {
+  if (!accessToken) return !isProduction;
+  return req.headers.authorization === `Bearer ${accessToken}`;
+}
+
+function withinRateLimit(req) {
+  const key = req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const recent = (requestWindow.get(key) || []).filter((time) => now - time < 60_000);
+  if (recent.length >= 60) return false;
+  recent.push(now); requestWindow.set(key, recent);
+  return true;
 }
 
 function readJson(req) {
@@ -159,6 +188,14 @@ async function capture(req, res) {
 }
 
 createServer(async (req, res) => {
+  if (!allowOrigin(req, res)) return send(res, 403, { error: 'ORIGIN_NOT_ALLOWED' });
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  if (req.url?.startsWith('/api/')) {
+    if (isProduction && !accessToken) return send(res, 503, { error: 'ACCESS_TOKEN_NOT_CONFIGURED', message: 'Серверу нужен личный токен доступа.' });
+    if (!authorized(req)) return send(res, 401, { error: 'AUTH_REQUIRED', message: 'Нужен личный токен приложения.' });
+    if (!withinRateLimit(req)) return send(res, 429, { error: 'RATE_LIMITED', message: 'Слишком много запросов, попробуйте через минуту.' });
+  }
+  if (req.method === 'GET' && req.url === '/api/health') return send(res, 200, { ok: true });
   if (req.method === 'POST' && req.url === '/api/reflect') return reflect(req, res);
   if (req.method === 'POST' && req.url === '/api/meditation') return meditation(req, res);
   if (req.method === 'POST' && req.url === '/api/archive') return archive(req, res);

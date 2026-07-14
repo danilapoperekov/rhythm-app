@@ -1,6 +1,7 @@
 import { normalizeCaptureProposal, normalizeLocalState, splitTextForAnalysis, validBackup } from './js/core.js';
 import { blobToDataUrl as audioBlobToDataUrl, dataUrlToBlob as audioDataUrlToBlob, deleteAudioRecord, getAllAudioRecords, getAudioBlob, putAudioRecords, saveAudioBlob } from './js/audio-store.js';
 import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from './js/backup-crypto.js';
+import { aiServerReady, apiFetch } from './js/api-client.js';
 
 (() => {
   'use strict';
@@ -244,7 +245,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
     const collected = { dreams: [], sleeps: [], checkins: [], journals: [] };
     for (let index = 0; index < chunks.length; index += 1) {
       toast(`ИИ разбирает часть ${index + 1} из ${chunks.length}…`);
-      const response = await fetch('/api/archive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true, text: chunks[index], context: aiContextText() }) });
+      const response = await apiFetch('/api/archive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true, text: chunks[index], context: aiContextText() }) });
       const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Не удалось разобрать файл');
       ['dreams', 'sleeps', 'checkins', 'journals'].forEach((key) => collected[key].push(...(Array.isArray(payload[key]) ? payload[key] : [])));
     }
@@ -356,7 +357,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
       if (capture.transcript) form.append('text', capture.transcript);
       const context = aiContextText();
       if (context) form.append('personalContext', context);
-      const response = await fetch('/api/capture', { method: 'POST', body: form });
+      const response = await apiFetch('/api/capture', { method: 'POST', body: form });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || payload.error || 'AI_UNAVAILABLE');
       capture.transcript = payload.transcript || capture.transcript;
@@ -637,7 +638,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
     };
     app.innerHTML = `<div class="page">
       ${pageHeader('Под вашим контролем', 'Настройки', 'Приватность, перенос данных и будущие подключения.', '')}
-      <div class="grid dashboard-grid"><div class="stack"><section class="card"><div class="card-head"><div><div class="eyebrow">Локальный сейф</div><h2>Ваши данные</h2></div><span class="badge">на устройстве</span></div><div class="settings-list"><div class="settings-row"><div class="settings-icon">⌂</div><div><h3>Локальное хранение</h3><p>Записи остаются в этом браузере даже без интернета. В ИИ ничего не отправляется автоматически.</p></div><span class="badge">активно</span></div><div class="settings-row"><div class="settings-icon">⇩</div><div><h3>Полная резервная копия</h3><p>${Math.max(1, Math.round(size / 1024))} КБ · для восстановления на другом устройстве.</p></div><button class="btn btn-secondary" data-export>JSON</button></div><div class="settings-row settings-row-secure"><div class="settings-icon">⌑</div><div><h3>Зашифрованная копия</h3><p>Перенос между iPhone и Windows с паролем. Файл нельзя прочитать без него.</p></div><button class="btn btn-primary" data-export-encrypted>Зашифровать</button></div><div class="settings-row"><div class="settings-icon">≡</div><div><h3>Читаемый архив</h3><p>Все сны, мысли, ответы и дневниковые записи — одним Markdown-файлом.</p></div><button class="btn btn-secondary" data-export-text>TXT</button></div><div class="settings-row"><div class="settings-icon">⇧</div><div><h3>Восстановить копию</h3><p>Поддерживает обычный и зашифрованный файл. Данные на этом устройстве будут заменены.</p></div><button class="btn btn-secondary" data-import>Выбрать</button></div></div></section><section class="card"><h2>Профиль и цели</h2><form id="profile-form" class="form-grid"><div class="field"><label for="profile-name">Как вас называть</label><input id="profile-name" name="name" value="${esc(state.profile.name)}" placeholder="Имя"></div><div class="field"><label for="sleep-goal">Цель сна, часов</label><input id="sleep-goal" name="sleepGoal" type="number" min="4" max="12" step="0.5" value="${state.profile.sleepGoal}"></div><div class="form-actions field full"><button class="btn btn-primary" type="submit">Сохранить</button></div></form></section></div><aside class="stack"><section class="card data-vault-card"><div class="eyebrow">Содержимое сейфа</div><h2>Всё ваше — переносимо</h2><div class="vault-stats"><div><b>${counts.dreams}</b><span>снов</span></div><div><b>${counts.journals}</b><span>дневников</span></div><div><b>${counts.reflections}</b><span>ответов</span></div><div><b>${counts.practices + counts.workouts}</b><span>практик</span></div></div><p class="muted">Текстовые записи и голосовые заметки входят в полную копию. Зашифрованный вариант лучше для переноса.</p></section><section class="card"><h2>Перенос без облака</h2><p class="muted" style="font-size:11px;line-height:1.6">Скачайте зашифрованный файл, перенесите его любым удобным способом и восстановите на втором устройстве. Пароль не сохраняется и не восстанавливается нами.</p></section><section class="card"><h2>Чистый лист</h2><p class="muted" style="font-size:11px;line-height:1.6">Удалит все записи на этом устройстве. Сначала скачайте резервную копию.</p><button class="btn btn-danger" data-reset>Удалить все данные</button></section></aside></div>
+      <div class="grid dashboard-grid"><div class="stack"><section class="card"><div class="card-head"><div><div class="eyebrow">Локальный сейф</div><h2>Ваши данные</h2></div><span class="badge">на устройстве</span></div><div class="settings-list"><div class="settings-row"><div class="settings-icon">⌂</div><div><h3>Локальное хранение</h3><p>Записи остаются в этом браузере даже без интернета. В ИИ ничего не отправляется автоматически.</p></div><span class="badge">активно</span></div><div class="settings-row settings-row-secure"><div class="settings-icon">✦</div><div><h3>ИИ-сервер</h3><p>${aiServerReady() ? 'Защищённое подключение настроено на этом устройстве.' : 'Пока не подключён. Ключ OpenAI никогда не вводится в PWA.'}</p></div><button class="btn ${aiServerReady() ? 'btn-secondary' : 'btn-primary'}" data-modal="apiConnection">${aiServerReady() ? 'Изменить' : 'Подключить'}</button></div><div class="settings-row"><div class="settings-icon">⇩</div><div><h3>Полная резервная копия</h3><p>${Math.max(1, Math.round(size / 1024))} КБ · для восстановления на другом устройстве.</p></div><button class="btn btn-secondary" data-export>JSON</button></div><div class="settings-row settings-row-secure"><div class="settings-icon">⌑</div><div><h3>Зашифрованная копия</h3><p>Перенос между iPhone и Windows с паролем. Файл нельзя прочитать без него.</p></div><button class="btn btn-primary" data-export-encrypted>Зашифровать</button></div><div class="settings-row"><div class="settings-icon">≡</div><div><h3>Читаемый архив</h3><p>Все сны, мысли, ответы и дневниковые записи — одним Markdown-файлом.</p></div><button class="btn btn-secondary" data-export-text>TXT</button></div><div class="settings-row"><div class="settings-icon">⇧</div><div><h3>Восстановить копию</h3><p>Поддерживает обычный и зашифрованный файл. Данные на этом устройстве будут заменены.</p></div><button class="btn btn-secondary" data-import>Выбрать</button></div></div></section><section class="card"><h2>Профиль и цели</h2><form id="profile-form" class="form-grid"><div class="field"><label for="profile-name">Как вас называть</label><input id="profile-name" name="name" value="${esc(state.profile.name)}" placeholder="Имя"></div><div class="field"><label for="sleep-goal">Цель сна, часов</label><input id="sleep-goal" name="sleepGoal" type="number" min="4" max="12" step="0.5" value="${state.profile.sleepGoal}"></div><div class="form-actions field full"><button class="btn btn-primary" type="submit">Сохранить</button></div></form></section></div><aside class="stack"><section class="card data-vault-card"><div class="eyebrow">Содержимое сейфа</div><h2>Всё ваше — переносимо</h2><div class="vault-stats"><div><b>${counts.dreams}</b><span>снов</span></div><div><b>${counts.journals}</b><span>дневников</span></div><div><b>${counts.reflections}</b><span>ответов</span></div><div><b>${counts.practices + counts.workouts}</b><span>практик</span></div></div><p class="muted">Текстовые записи и голосовые заметки входят в полную копию. Зашифрованный вариант лучше для переноса.</p></section><section class="card"><h2>Перенос без облака</h2><p class="muted" style="font-size:11px;line-height:1.6">Скачайте зашифрованный файл, перенесите его любым удобным способом и восстановите на втором устройстве. Пароль не сохраняется и не восстанавливается нами.</p></section><section class="card"><h2>Чистый лист</h2><p class="muted" style="font-size:11px;line-height:1.6">Удалит все записи на этом устройстве. Сначала скачайте резервную копию.</p><button class="btn btn-danger" data-reset>Удалить все данные</button></section></aside></div>
     </div>`;
   }
 
@@ -717,7 +718,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
     if (!meditation) return;
     if (meditation.audioId) { await playVoiceRecording(meditation.audioId); return; }
     try {
-      const response = await fetch('/api/meditation/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: meditation.text, consent: true }) });
+      const response = await apiFetch('/api/meditation/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: meditation.text, consent: true }) });
       if (response.ok) { const url = URL.createObjectURL(await response.blob()); const player = new Audio(url); player.onended = () => URL.revokeObjectURL(url); await player.play(); toast(`ИИ-озвучка: ${meditation.title}`); return; }
     } catch (_) { /* local voice is the intentional offline fallback */ }
     if (!('speechSynthesis' in window)) { toast('Озвучка недоступна на этом устройстве'); return; }
@@ -820,6 +821,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
       workout: workoutForm,
       workoutProfile: workoutProfileForm,
       assistant: assistantForm,
+      apiConnection: apiConnectionForm,
       aiContext: aiContextForm,
       meditationGenerator: meditationGeneratorForm,
       meditationMedia: meditationMediaForm
@@ -857,6 +859,11 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
   const aiContextForm = {
     head: modalHead('Личный контекст ИИ', 'Здесь можно описать, что поможет общаться с вами бережнее. Контекст хранится локально и передаётся только при включённом согласии.'),
     body: `<form id="ai-context-form" class="form-grid"><div class="field full"><label for="ai-tone">Какой стиль вам подходит</label><textarea id="ai-tone" name="tone" placeholder="Например: спокойно, коротко, без давления и оценок" style="min-height:80px">${esc(state.profile.aiContext?.tone || '')}</textarea></div><div class="field full"><label for="ai-goals">Цели и важные ориентиры</label><textarea id="ai-goals" name="goals" placeholder="Например: восстановить режим сна, сохранить творчество, снизить перегрузку" style="min-height:80px">${esc(state.profile.aiContext?.goals || '')}</textarea></div><div class="field full"><label for="ai-boundaries">Границы для ИИ</label><textarea id="ai-boundaries" name="boundaries" placeholder="Например: не давать медицинских диагнозов, не предлагать жёсткие планы" style="min-height:80px">${esc(state.profile.aiContext?.boundaries || '')}</textarea></div><div class="field full"><label class="statistics-consent"><input name="share" type="checkbox" ${state.profile.aiContext?.share ? 'checked' : ''}> Разрешаю использовать этот контекст в ИИ-запросах.</label></div>${formActions('Сохранить контекст')}</form>`
+  };
+
+  const apiConnectionForm = {
+    head: modalHead('Подключить ИИ-сервер', 'Введите только HTTPS-адрес сервера и личный токен. Ключ OpenAI никогда не вводится в PWA и не сохраняется в GitHub.'),
+    body: `<form id="api-connection-form" class="form-grid"><div class="field full"><label for="api-url">HTTPS-адрес сервера</label><input id="api-url" name="url" type="url" value="${esc(localStorage.getItem('rhythm-api-url') || globalThis.RHYTHM_API_URL || '')}" placeholder="https://rhythm-ai.onrender.com" autocomplete="url" required></div><div class="field full"><label for="api-token">Личный токен устройства</label><input id="api-token" name="token" type="password" value="${esc(localStorage.getItem('rhythm-api-token') || '')}" placeholder="Токен, заданный на сервере" autocomplete="off" minlength="16" required></div><p class="form-note field full">Адрес и токен остаются только в локальном хранилище этого устройства. На iPhone и Windows их нужно добавить отдельно. Если потеряете токен — создайте новый в настройках сервера.</p>${formActions('Сохранить подключение')}</form>`
   };
 
   const setupForm = {
@@ -1007,7 +1014,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
       const snapshot = getRecentDays(14).map((day) => { const date = dateKey(day), sleep = state.sleeps[date], checkin = state.checkins[date]; return `${date}: сон ${sleep?.hours ?? '—'}ч, энергия ${checkin?.energy ?? '—'}, настроение ${checkin?.mood ?? '—'}, тревога ${checkin?.stress ?? '—'}, спокойствие ${checkin?.calm ?? '—'}`; }).join('\n');
       if (result) result.innerHTML = '<p class="muted">Готовлю бережный обзор…</p>';
       try {
-        const response = await fetch('/api/reflect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true, context: `Сводка за 14 дней:\n${snapshot}\n\n${aiContextText() ? `Личный контекст, разрешённый пользователем:\n${aiContextText()}\n\n` : ''}Пользовательские тексты отправлены добровольно для поиска тем и целей. Не ставь диагнозов.`, text: recent.map((item) => `${item.date}: ${item.text}`).join('\n\n') || 'Текстовых записей пока нет.' }) });
+        const response = await apiFetch('/api/reflect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true, context: `Сводка за 14 дней:\n${snapshot}\n\n${aiContextText() ? `Личный контекст, разрешённый пользователем:\n${aiContextText()}\n\n` : ''}Пользовательские тексты отправлены добровольно для поиска тем и целей. Не ставь диагнозов.`, text: recent.map((item) => `${item.date}: ${item.text}`).join('\n\n') || 'Текстовых записей пока нет.' }) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.message || 'ИИ временно недоступен');
         let report; try { report = JSON.parse(payload.result); } catch { report = { summary: payload.result }; }
@@ -1146,7 +1153,14 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
   document.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = formData(event.target);
-    if (event.target.id === 'meditation-media-form') {
+    if (event.target.id === 'api-connection-form') {
+      const url = data.url.trim().replace(/\/$/, '');
+      if (!/^https:\/\//i.test(url)) { toast('Нужен защищённый HTTPS-адрес сервера'); return; }
+      if (data.token.trim().length < 16) { toast('Введите полный личный токен устройства'); return; }
+      localStorage.setItem('rhythm-api-url', url);
+      localStorage.setItem('rhythm-api-token', data.token.trim());
+      saveState('ИИ-сервер подключён на этом устройстве'); closeModal(); renderSettings();
+    } else if (event.target.id === 'meditation-media-form') {
       const file = event.target.querySelector('[name="file"]')?.files?.[0];
       if (!file) { toast('Выберите аудио или видео'); return; }
       if (file.size > 80 * 1024 * 1024) { toast('Для локального хранения выберите файл до 80 МБ'); return; }
@@ -1156,7 +1170,7 @@ import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from
     } else if (event.target.id === 'meditation-generator-form') {
       if (data.consent !== 'on') { toast('Нужно подтвердить отправку запроса в ИИ'); return; }
       try {
-        const response = await fetch('/api/meditation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: data.request.trim(), duration: Number(data.duration), title: data.title.trim(), consent: true, context: aiContextText() }) });
+        const response = await apiFetch('/api/meditation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: data.request.trim(), duration: Number(data.duration), title: data.title.trim(), consent: true, context: aiContextText() }) });
         const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'ИИ временно недоступен');
         state.meditationLibrary.push({ id: uid('custom-med'), title: payload.title || data.title.trim() || 'Моя практика', duration: Number(payload.duration) || Number(data.duration), theme: payload.theme || 'личная', text: payload.text });
         saveState('Новая медитация сохранена в библиотеке'); closeModal(); navigate('practice');
