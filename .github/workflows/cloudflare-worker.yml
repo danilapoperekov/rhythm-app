@@ -21,14 +21,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cloudflare/wrangler-action@v3
+      - name: Deploy Worker shell
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+      - name: Upload Worker secrets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: secret bulk
           secrets: |
             OPENAI_API_KEY
             RHYTHM_ACCESS_TOKEN
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           RHYTHM_ACCESS_TOKEN: ${{ secrets.RHYTHM_ACCESS_TOKEN }}
+
+      - name: Redeploy Worker with secrets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

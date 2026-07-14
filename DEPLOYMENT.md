@@ -24,11 +24,13 @@ Cloudflare Worker можно развернуть на бесплатном пл
 В GitHub открой репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret** и добавь:
 
 - `CLOUDFLARE_API_TOKEN` — токен Cloudflare с правом деплоя Workers.
-- `CLOUDFLARE_ACCOUNT_ID` — Account ID из Cloudflare dashboard.
+- `CLOUDFLARE_ACCOUNT_ID` — Account ID из Cloudflare dashboard. Нужен именно ID аккаунта, обычно это длинная строка из букв `a-f` и цифр, без пробелов и без названия аккаунта.
 - `OPENAI_API_KEY` — ключ OpenAI API.
 - `RHYTHM_ACCESS_TOKEN` — длинный личный токен для входа PWA в твой Worker.
 
 После этого открой **Actions** → **Deploy Rhythm AI Worker** → **Run workflow**.
+
+Если workflow падает с `object identifier is invalid`, проверь `CLOUDFLARE_ACCOUNT_ID`: чаще всего туда случайно вставляют название аккаунта, email, zone id или значение с пробелом. Правильный Account ID находится в Cloudflare dashboard на странице аккаунта/Workers.
 
 Когда workflow завершится, в логах Cloudflare deploy появится адрес вида:
 
