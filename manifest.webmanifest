@@ -4,7 +4,12 @@
   "description": "Сон, состояние, привычки и планы в одном спокойном пространстве.",
   "lang": "ru",
   "start_url": "./",
+  "id": "./rhythm",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "categories": ["health", "lifestyle", "productivity"],
   "background_color": "#f5f2eb",
   "theme_color": "#f5f2eb",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
