@@ -17,7 +17,31 @@ Cloudflare Worker можно развернуть на бесплатном пл
 - `RHYTHM_ALLOWED_ORIGINS` уже задан в `wrangler.toml` как `https://danilapoperekov.github.io`.
 - `RHYTHM_AI_MODEL` задан как `gpt-5.6-terra`; перед сменой модели сверяемся с официальной документацией OpenAI.
 
-## Развертывание через Windows
+## Вариант 1: развертывание через GitHub без установки npm на Windows
+
+Этот вариант лучше для текущего компьютера: GitHub сам запустит Cloudflare deploy.
+
+В GitHub открой репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret** и добавь:
+
+- `CLOUDFLARE_API_TOKEN` — токен Cloudflare с правом деплоя Workers.
+- `CLOUDFLARE_ACCOUNT_ID` — Account ID из Cloudflare dashboard.
+- `OPENAI_API_KEY` — ключ OpenAI API.
+- `RHYTHM_ACCESS_TOKEN` — длинный личный токен для входа PWA в твой Worker.
+
+После этого открой **Actions** → **Deploy Rhythm AI Worker** → **Run workflow**.
+
+Когда workflow завершится, в логах Cloudflare deploy появится адрес вида:
+
+```text
+https://rhythm-ai.<твой-аккаунт>.workers.dev
+```
+
+Открой PWA → «Настройки» → «ИИ-сервер» и введи:
+
+- HTTPS-адрес Worker;
+- тот же `RHYTHM_ACCESS_TOKEN`, который был добавлен в GitHub Secrets.
+
+## Вариант 2: развертывание через Windows с установленным npm
 
 В терминале из папки проекта:
 
