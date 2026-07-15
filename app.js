@@ -542,6 +542,20 @@ import { clearStoredState, loadStoredState, saveStoredState } from './js/state-s
         </div>
       </div>
     </div>`;
+    addTodayTaskControls(todayTasks);
+  }
+
+  function addTodayTaskControls(todayTasks) {
+    const timeline = app.querySelector('.timeline');
+    if (!timeline) return;
+    timeline.insertAdjacentHTML('beforebegin', '<form id="today-quick-form" class="today-quick-add"><input name="title" placeholder="Добавить задачу на сегодня" maxlength="100" required><button type="submit" aria-label="Добавить задачу">＋</button></form>');
+    timeline.querySelectorAll('.timeline-item').forEach((row, index) => {
+      const task = todayTasks[index];
+      const content = row.lastElementChild;
+      if (!task || !content) return;
+      content.classList.add('timeline-task');
+      content.innerHTML = `<div>${content.innerHTML}</div><button class="timeline-toggle ${task.done ? 'done' : ''}" data-task-toggle="${task.id}" aria-label="${task.done ? 'Вернуть задачу' : 'Завершить задачу'}">${task.done ? '✓' : ''}</button>`;
+    });
   }
 
   function buildInsight() {
@@ -1333,6 +1347,11 @@ import { clearStoredState, loadStoredState, saveStoredState } from './js/state-s
     } else if (event.target.id === 'habit-form') {
       state.habits.push({ id: uid('habit'), name: data.name.trim(), icon: data.icon, color: COLORS[state.habits.length % COLORS.length], goal: data.goal.trim(), dates: [] });
       saveState('Привычка добавлена'); closeModal(); renderers[currentView]();
+    } else if (event.target.id === 'today-quick-form') {
+      const title = data.title.trim();
+      if (!title) return;
+      state.tasks.push({ id: uid('task'), title, date: dateKey(new Date()), time: '', category: 'self', note: '', done: false, cancelled: false });
+      saveState('Задача добавлена на сегодня'); renderToday();
     } else if (event.target.id === 'plan-quick-form') {
       const title = data.title.trim();
       if (!title) return;

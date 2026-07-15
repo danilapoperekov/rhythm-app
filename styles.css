@@ -126,6 +126,16 @@ h3 { font-size: 15px; margin-bottom: 8px; }
 .timeline-title { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
 .timeline-desc { color: var(--muted); font-size: 10px; }
 .task-done .timeline-title { text-decoration: line-through; opacity: .5; }
+.timeline-task { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.timeline-task > div { min-width: 0; }
+.timeline-toggle { flex: 0 0 22px; width: 22px; height: 22px; border: 1px solid #cbd5e7; border-radius: 50%; background: #fff; color: #fff; cursor: pointer; font-weight: 800; line-height: 1; }
+.timeline-toggle:hover { border-color: var(--blue); }
+.timeline-toggle.done { border-color: var(--green); background: var(--green); }
+.today-quick-add { display: grid; grid-template-columns: 1fr 28px; gap: 8px; align-items: center; margin: 0 0 13px; padding: 5px 6px 5px 11px; border: 1px solid #e2e7f0; border-radius: 7px; background: #f8faff; }
+.today-quick-add:focus-within { border-color: #92abf7; box-shadow: 0 0 0 3px rgba(71,114,237,.1); background: #fff; }
+.today-quick-add input { min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; }
+.today-quick-add input::placeholder { color: #9ba4b2; }
+.today-quick-add button { width: 28px; height: 28px; border: 0; border-radius: 6px; background: var(--blue); color: #fff; cursor: pointer; font-size: 18px; line-height: 1; }
 
 .insight { background: #e3ebd9; border-color: #d2dfc7; }
 .insight-top { display: flex; gap: 14px; align-items: flex-start; }
