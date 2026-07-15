@@ -3,11 +3,15 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { extractJsonText, jsonOnlyInstructions, openAICompatibleChatUrl } from './js/llm-utils.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const port = Number(process.env.PORT || 4173);
-const apiKey = process.env.OPENAI_API_KEY;
-const model = process.env.RHYTHM_AI_MODEL || 'gpt-5.6-terra';
+const openaiApiKey = process.env.OPENAI_API_KEY;
+const textProvider = String(process.env.RHYTHM_LLM_PROVIDER || 'openai').trim().toLowerCase();
+const textModel = process.env.RHYTHM_LLM_MODEL || process.env.RHYTHM_AI_MODEL || 'gpt-5.6-terra';
+const compatibleBaseUrl = String(process.env.RHYTHM_LLM_BASE_URL || '').trim().replace(/\/+$/, '');
+const compatibleApiKey = process.env.RHYTHM_LLM_API_KEY || process.env.HF_TOKEN || '';
 const accessToken = process.env.RHYTHM_ACCESS_TOKEN || '';
 const isProduction = process.env.NODE_ENV === 'production';
 const allowedOrigins = new Set((process.env.RHYTHM_ALLOWED_ORIGINS || 'https://danilapoperekov.github.io,http://localhost:4173,http://127.0.0.1:4173').split(',').map((value) => value.trim()).filter(Boolean));
@@ -62,8 +66,65 @@ function readJson(req) {
   });
 }
 
+function isOpenAITextProvider() {
+  return textProvider === 'openai';
+}
+
+function textAIConfigured() {
+  return isOpenAITextProvider() ? Boolean(openaiApiKey) : Boolean(compatibleBaseUrl && textModel);
+}
+
+function healthPayload() {
+  return {
+    ok: true,
+    ai: {
+      textProvider,
+      textModel,
+      textConfigured: textAIConfigured(),
+      speechConfigured: Boolean(openaiApiKey)
+    }
+  };
+}
+
+async function textCompletion({ instructions, input, schema, schemaName = 'rhythm_json', maxOutputTokens = 900 }) {
+  if (isOpenAITextProvider()) {
+    const body = { model: textModel, store: false, reasoning: { effort: 'low' }, instructions, input };
+    if (maxOutputTokens) body.max_output_tokens = maxOutputTokens;
+    if (schema) body.text = { format: { type: 'json_schema', name: schemaName, strict: true, schema } };
+    const upstream = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await upstream.json();
+    if (!upstream.ok) return { ok: false, status: upstream.status, error: data?.error?.message || 'Не удалось получить ответ ИИ.' };
+    return { ok: true, text: data.output_text || '', model: textModel, provider: 'openai' };
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (compatibleApiKey) headers.Authorization = `Bearer ${compatibleApiKey}`;
+  const upstream = await fetch(openAICompatibleChatUrl(compatibleBaseUrl), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: textModel,
+      stream: false,
+      temperature: 0.2,
+      max_tokens: maxOutputTokens,
+      messages: [
+        { role: 'system', content: schema ? jsonOnlyInstructions(instructions, schemaName) : instructions },
+        { role: 'user', content: schema ? `${input}\n\nJSON Schema:\n${JSON.stringify(schema)}` : input }
+      ]
+    })
+  });
+  const data = await upstream.json().catch(() => ({}));
+  if (!upstream.ok) return { ok: false, status: upstream.status, error: data?.error?.message || data?.message || 'Не удалось получить ответ ИИ.' };
+  const text = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
+  return { ok: true, text: schema ? extractJsonText(text) : text, model: textModel, provider: textProvider };
+}
+
 async function reflect(req, res) {
-  if (!apiKey) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен.' });
+  if (!textAIConfigured()) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен.' });
   let input;
   try { input = await readJson(req); } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
   if (input.consent !== true) return send(res, 403, { error: 'CONSENT_REQUIRED', message: 'Нужно явное согласие на отправку этой записи в ИИ.' });
@@ -74,21 +135,16 @@ async function reflect(req, res) {
 
   const instructions = `Ты бережный помощник приложения «Ритм». Анализируй только текст, который пользователь явно передал в этом запросе. Не ставь диагнозов, не называй себя терапевтом, не утверждай причинность там, где есть лишь предположение. Верни короткий ответ по-русски строго в JSON без Markdown: {"summary":"...","themes":["..."],"patterns":["..."],"gentle_next_step":"...","limits":"..."}. В limits укажи, что это интерпретация текста, а не медицинский вывод.`;
   try {
-    const upstream = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, reasoning: { effort: 'low' }, instructions, input: `Контекст пользователя:\n${context || 'не передан'}\n\nТекст для анализа:\n${text}`, max_output_tokens: 700 })
-    });
-    const data = await upstream.json();
-    if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: data?.error?.message || 'Не удалось получить ответ ИИ.' });
-    return send(res, 200, { result: data.output_text || '', model });
+    const upstream = await textCompletion({ instructions, input: `Контекст пользователя:\n${context || 'не передан'}\n\nТекст для анализа:\n${text}`, maxOutputTokens: 700 });
+    if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: upstream.error });
+    return send(res, 200, { result: upstream.text, model: upstream.model, provider: upstream.provider });
   } catch {
     return send(res, 502, { error: 'AI_UNAVAILABLE', message: 'ИИ временно недоступен. Локальная запись осталась на устройстве.' });
   }
 }
 
 async function meditation(req, res) {
-  if (!apiKey) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен.' });
+  if (!textAIConfigured()) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен.' });
   let input; try { input = await readJson(req); } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
   if (input.consent !== true) return send(res, 403, { error: 'CONSENT_REQUIRED' });
   const request = String(input.request || '').trim().slice(0, 5000);
@@ -97,14 +153,14 @@ async function meditation(req, res) {
   const schema = { type: 'object', additionalProperties: false, required: ['title', 'theme', 'duration', 'text'], properties: { title: { type: 'string' }, theme: { type: 'string' }, duration: { type: 'integer' }, text: { type: 'string' } } };
   const instructions = `Создай бережный сценарий медитации на русском примерно на ${duration} минут. Не ставь диагнозов, не обещай лечение, не используй давление. Нужен только спокойный текст для озвучки с короткими паузами в естественной речи. Контекст пользователя — настройка стиля, не медицинский факт: ${String(input.context || '').slice(0, 4000) || 'не передан'}.`;
   try {
-    const upstream = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, store: false, reasoning: { effort: 'low' }, instructions, input: request, text: { format: { type: 'json_schema', name: 'rhythm_meditation', strict: true, schema } } }) });
-    const data = await upstream.json(); if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: data?.error?.message || 'Не удалось создать сценарий.' });
-    return send(res, 200, JSON.parse(data.output_text || '{}'));
+    const upstream = await textCompletion({ instructions, input: request, schema, schemaName: 'rhythm_meditation', maxOutputTokens: 1600 });
+    if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: upstream.error || 'Не удалось создать сценарий.' });
+    return send(res, 200, JSON.parse(extractJsonText(upstream.text) || '{}'));
   } catch { return send(res, 502, { error: 'AI_UNAVAILABLE', message: 'ИИ временно недоступен.' }); }
 }
 
 async function archive(req, res) {
-  if (!apiKey) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен.' });
+  if (!textAIConfigured()) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен.' });
   let input; try { input = await readJson(req); } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
   if (input.consent !== true) return send(res, 403, { error: 'CONSENT_REQUIRED' });
   const text = String(input.text || '').trim(); if (!text) return send(res, 400, { error: 'EMPTY_TEXT' });
@@ -118,19 +174,19 @@ async function archive(req, res) {
   } };
   const instructions = `Ты разбираешь личный архив для приложения «Ритм». Верни только записи, которые прямо есть в тексте; ничего не выдумывай. Даты строго YYYY-MM-DD, если дата неясна — не создавай соответствующую запись. Для снов сделай краткий бережный анализ образов как гипотезу, без диагнозов и утверждений о психическом состоянии. В числовые шкалы ставь числа только при явном упоминании, иначе null. Личный контекст задаёт только стиль: ${String(input.context || '').slice(0, 4000) || 'не передан'}.`;
   try {
-    const upstream = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, store: false, reasoning: { effort: 'low' }, instructions, input: text, text: { format: { type: 'json_schema', name: 'rhythm_archive', strict: true, schema } } }) });
-    const data = await upstream.json(); if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: data?.error?.message || 'Не удалось разобрать архив.' });
-    return send(res, 200, JSON.parse(data.output_text || '{}'));
+    const upstream = await textCompletion({ instructions, input: text, schema, schemaName: 'rhythm_archive', maxOutputTokens: 3000 });
+    if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: upstream.error || 'Не удалось разобрать архив.' });
+    return send(res, 200, JSON.parse(extractJsonText(upstream.text) || '{}'));
   } catch { return send(res, 502, { error: 'AI_UNAVAILABLE', message: 'ИИ временно недоступен.' }); }
 }
 
 async function meditationVoice(req, res) {
-  if (!apiKey) return send(res, 503, { error: 'AI_NOT_CONFIGURED' });
+  if (!openaiApiKey) return send(res, 503, { error: 'AI_NOT_CONFIGURED' });
   let input; try { input = await readJson(req); } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
   if (input.consent !== true) return send(res, 403, { error: 'CONSENT_REQUIRED' });
   const text = String(input.text || '').trim().slice(0, 4096); if (!text) return send(res, 400, { error: 'EMPTY_TEXT' });
   try {
-    const upstream = await fetch('https://api.openai.com/v1/audio/speech', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice: 'coral', input: text, response_format: 'mp3' }) });
+    const upstream = await fetch('https://api.openai.com/v1/audio/speech', { method: 'POST', headers: { Authorization: `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice: 'coral', input: text, response_format: 'mp3' }) });
     if (!upstream.ok) { const data = await upstream.json(); return send(res, upstream.status, { error: 'TTS_ERROR', message: data?.error?.message || 'Не удалось создать озвучку.' }); }
     const audio = Buffer.from(await upstream.arrayBuffer()); res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' }); res.end(audio);
   } catch { return send(res, 502, { error: 'TTS_UNAVAILABLE' }); }
@@ -155,7 +211,7 @@ const captureSchema = {
 };
 
 async function capture(req, res) {
-  if (!apiKey) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен. Голос и черновик остались на устройстве.' });
+  if (!textAIConfigured()) return send(res, 503, { error: 'AI_NOT_CONFIGURED', message: 'Сервер ИИ пока не настроен. Голос и черновик остались на устройстве.' });
   if (Number(req.headers['content-length'] || 0) > 25 * 1024 * 1024 + 1024 * 256) return send(res, 413, { error: 'AUDIO_TOO_LARGE', message: 'Аудио больше 25 МБ.' });
   let form;
   try {
@@ -165,10 +221,11 @@ async function capture(req, res) {
   let transcript = String(form.get('text') || '').trim();
   const personalContext = String(form.get('personalContext') || '').trim().slice(0, 4000);
   if (audio && typeof audio === 'object' && 'size' in audio) {
+    if (!openaiApiKey) return send(res, 503, { error: 'TRANSCRIPTION_NOT_CONFIGURED', message: 'Для расшифровки голоса нужен OpenAI-ключ. Текстовый разбор может работать через локальную модель.' });
     if (audio.size > 25 * 1024 * 1024) return send(res, 413, { error: 'AUDIO_TOO_LARGE', message: 'Аудио больше 25 МБ.' });
     try {
       const upload = new FormData(); upload.append('file', audio, audio.name || 'rhythm.webm'); upload.append('model', 'gpt-4o-transcribe');
-      const upstream = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, body: upload });
+      const upstream = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { Authorization: `Bearer ${openaiApiKey}` }, body: upload });
       const data = await upstream.json();
       if (!upstream.ok) return send(res, upstream.status, { error: 'TRANSCRIPTION_ERROR', message: data?.error?.message || 'Не удалось расшифровать аудио.' });
       transcript = String(data.text || '').trim();
@@ -178,12 +235,11 @@ async function capture(req, res) {
   const today = new Date().toISOString().slice(0, 10);
   const instructions = `Ты бережный маршрутизатор приложения «Ритм». Раздели речь на независимые карточки. Не анализируй психику и не ставь диагнозов. Каждая карточка содержит только факты из текста. Сегодня ${today}; дату ставь сегодня, если другая дата не названа. Время задачи — только при явном упоминании, иначе пустая строка. Категория задачи self, если работа или здоровье не названы. Шкалы mood, energy, stress, calm, rating заполняй числами 1–10 только при явном значении, иначе null. Новую привычку не создавай: если привычки нет в тексте как существующей — kind inbox. Неясное и смешанное не теряй: kind inbox. source — точная часть исходной речи, text — её чистый текст. ${personalContext ? `Личный контекст — это только настройка стиля и границ, не факт о пользователе:\n${personalContext}` : ''} Верни JSON строго по схеме.`;
   try {
-    const upstream = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, store: false, reasoning: { effort: 'low' }, instructions, input: transcript, text: { format: { type: 'json_schema', name: 'rhythm_capture', strict: true, schema: captureSchema } } }) });
-    const data = await upstream.json();
-    if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: data?.error?.message || 'Не удалось разобрать запись.' });
-    const parsed = JSON.parse(data.output_text || '{}');
+    const upstream = await textCompletion({ instructions, input: transcript, schema: captureSchema, schemaName: 'rhythm_capture', maxOutputTokens: 2200 });
+    if (!upstream.ok) return send(res, upstream.status, { error: 'AI_UPSTREAM_ERROR', message: upstream.error || 'Не удалось разобрать запись.' });
+    const parsed = JSON.parse(extractJsonText(upstream.text) || '{}');
     const proposals = Array.isArray(parsed.proposals) ? parsed.proposals : [];
-    return send(res, 200, { transcript, proposals, model });
+    return send(res, 200, { transcript, proposals, model: upstream.model, provider: upstream.provider });
   } catch { return send(res, 502, { error: 'CAPTURE_UNAVAILABLE', message: 'ИИ временно недоступен. Черновик сохранён локально.' }); }
 }
 
@@ -195,7 +251,7 @@ createServer(async (req, res) => {
     if (!authorized(req)) return send(res, 401, { error: 'AUTH_REQUIRED', message: 'Нужен личный токен приложения.' });
     if (!withinRateLimit(req)) return send(res, 429, { error: 'RATE_LIMITED', message: 'Слишком много запросов, попробуйте через минуту.' });
   }
-  if (req.method === 'GET' && req.url === '/api/health') return send(res, 200, { ok: true });
+  if (req.method === 'GET' && req.url === '/api/health') return send(res, 200, healthPayload());
   if (req.method === 'POST' && req.url === '/api/reflect') return reflect(req, res);
   if (req.method === 'POST' && req.url === '/api/meditation') return meditation(req, res);
   if (req.method === 'POST' && req.url === '/api/archive') return archive(req, res);

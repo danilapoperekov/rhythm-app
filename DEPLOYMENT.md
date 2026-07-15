@@ -16,6 +16,28 @@ Cloudflare Worker можно развернуть на бесплатном пл
 - `RHYTHM_ACCESS_TOKEN` — личный длинный токен доступа к твоему ИИ-серверу. Это не OpenAI-ключ, а пароль между PWA и Worker.
 - `RHYTHM_ALLOWED_ORIGINS` уже задан в `wrangler.toml` как `https://danilapoperekov.github.io`.
 - `RHYTHM_AI_MODEL` задан как `gpt-5.6-terra`; перед сменой модели сверяемся с официальной документацией OpenAI.
+- `RHYTHM_LLM_PROVIDER` — текстовый провайдер: `openai` по умолчанию или `openai-compatible` для локальных/внешних chat-completions серверов.
+- `RHYTHM_LLM_MODEL` — модель для текстовых сценариев, если она отличается от `RHYTHM_AI_MODEL`.
+- `RHYTHM_LLM_BASE_URL` — базовый URL OpenAI-compatible сервера, например `http://127.0.0.1:8080/v1` для локального Bonsai.
+- `RHYTHM_LLM_API_KEY` — токен для внешнего OpenAI-compatible сервера. Для локального сервера обычно не нужен.
+
+## Локальный Bonsai или другой OpenAI-compatible LLM
+
+Текстовые функции «Ритма» можно переключить с OpenAI Responses API на локальную модель, если она запущена как OpenAI-compatible chat-completions сервер. Это подходит для разборов дневника, импорта, генерации сценариев медитаций и текстового ассистента.
+
+Для Bonsai 27B сейчас лучше использовать локальный GGUF/vLLM/llama.cpp запуск. На странице модели Hugging Face указано, что GGUF-вариант запускается через OpenAI-compatible сервер, но сам Bonsai 27B сейчас не развёрнут ни у одного Hugging Face Inference Provider. Поэтому `https://router.huggingface.co/v1` с этой конкретной моделью не является надёжным прямым вариантом, пока provider не появится.
+
+Пример локального запуска сервера приложения с Bonsai:
+
+```powershell
+$env:RHYTHM_LLM_PROVIDER = "openai-compatible"
+$env:RHYTHM_LLM_BASE_URL = "http://127.0.0.1:8080/v1"
+$env:RHYTHM_LLM_MODEL = "prism-ml/Bonsai-27B-gguf"
+$env:RHYTHM_ACCESS_TOKEN = "длинный_личный_токен_для_PWA"
+node server.mjs
+```
+
+Если нужен голосовой ввод или ИИ-озвучка медитаций, дополнительно нужен `OPENAI_API_KEY`: Bonsai закрывает текстовый разбор, но не speech-to-text и не TTS.
 
 ## Вариант 1: развертывание через GitHub без установки npm на Windows
 

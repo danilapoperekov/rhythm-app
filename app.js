@@ -638,7 +638,7 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     };
     app.innerHTML = `<div class="page">
       ${pageHeader('Под вашим контролем', 'Настройки', 'Приватность, перенос данных и будущие подключения.', '')}
-      <div class="grid dashboard-grid"><div class="stack"><section class="card"><div class="card-head"><div><div class="eyebrow">Локальный сейф</div><h2>Ваши данные</h2></div><span class="badge">на устройстве</span></div><div class="settings-list"><div class="settings-row"><div class="settings-icon">⌂</div><div><h3>Локальное хранение</h3><p>Записи остаются в этом браузере даже без интернета. В ИИ ничего не отправляется автоматически.</p></div><span class="badge">активно</span></div><div class="settings-row settings-row-secure"><div class="settings-icon">✦</div><div><h3>ИИ-сервер</h3><p>${aiServerReady() ? 'Защищённое подключение настроено на этом устройстве.' : 'Пока не подключён. Ключ OpenAI никогда не вводится в PWA.'}</p></div><button class="btn ${aiServerReady() ? 'btn-secondary' : 'btn-primary'}" data-modal="apiConnection">${aiServerReady() ? 'Изменить' : 'Подключить'}</button></div><div class="settings-row"><div class="settings-icon">⇩</div><div><h3>Полная резервная копия</h3><p>${Math.max(1, Math.round(size / 1024))} КБ · для восстановления на другом устройстве.</p></div><button class="btn btn-secondary" data-export>JSON</button></div><div class="settings-row settings-row-secure"><div class="settings-icon">⌑</div><div><h3>Зашифрованная копия</h3><p>Перенос между iPhone и Windows с паролем. Файл нельзя прочитать без него.</p></div><button class="btn btn-primary" data-export-encrypted>Зашифровать</button></div><div class="settings-row"><div class="settings-icon">≡</div><div><h3>Читаемый архив</h3><p>Все сны, мысли, ответы и дневниковые записи — одним Markdown-файлом.</p></div><button class="btn btn-secondary" data-export-text>TXT</button></div><div class="settings-row"><div class="settings-icon">⇧</div><div><h3>Восстановить копию</h3><p>Поддерживает обычный и зашифрованный файл. Данные на этом устройстве будут заменены.</p></div><button class="btn btn-secondary" data-import>Выбрать</button></div></div></section><section class="card"><h2>Профиль и цели</h2><form id="profile-form" class="form-grid"><div class="field"><label for="profile-name">Как вас называть</label><input id="profile-name" name="name" value="${esc(state.profile.name)}" placeholder="Имя"></div><div class="field"><label for="sleep-goal">Цель сна, часов</label><input id="sleep-goal" name="sleepGoal" type="number" min="4" max="12" step="0.5" value="${state.profile.sleepGoal}"></div><div class="form-actions field full"><button class="btn btn-primary" type="submit">Сохранить</button></div></form></section></div><aside class="stack"><section class="card data-vault-card"><div class="eyebrow">Содержимое сейфа</div><h2>Всё ваше — переносимо</h2><div class="vault-stats"><div><b>${counts.dreams}</b><span>снов</span></div><div><b>${counts.journals}</b><span>дневников</span></div><div><b>${counts.reflections}</b><span>ответов</span></div><div><b>${counts.practices + counts.workouts}</b><span>практик</span></div></div><p class="muted">Текстовые записи и голосовые заметки входят в полную копию. Зашифрованный вариант лучше для переноса.</p></section><section class="card"><h2>Перенос без облака</h2><p class="muted" style="font-size:11px;line-height:1.6">Скачайте зашифрованный файл, перенесите его любым удобным способом и восстановите на втором устройстве. Пароль не сохраняется и не восстанавливается нами.</p></section><section class="card"><h2>Чистый лист</h2><p class="muted" style="font-size:11px;line-height:1.6">Удалит все записи на этом устройстве. Сначала скачайте резервную копию.</p><button class="btn btn-danger" data-reset>Удалить все данные</button></section></aside></div>
+      <div class="grid dashboard-grid"><div class="stack"><section class="card"><div class="card-head"><div><div class="eyebrow">Локальный сейф</div><h2>Ваши данные</h2></div><span class="badge">на устройстве</span></div><div class="settings-list"><div class="settings-row"><div class="settings-icon">⌂</div><div><h3>Локальное хранение</h3><p>Записи остаются в этом браузере даже без интернета. В ИИ ничего не отправляется автоматически.</p></div><span class="badge">активно</span></div><div class="settings-row settings-row-secure"><div class="settings-icon">✦</div><div><h3>ИИ-сервер</h3><p>${aiServerSummary()}</p></div><button class="btn ${aiServerReady() ? 'btn-secondary' : 'btn-primary'}" data-modal="apiConnection">${aiServerReady() ? 'Изменить' : 'Подключить'}</button></div><div class="settings-row"><div class="settings-icon">⇩</div><div><h3>Полная резервная копия</h3><p>${Math.max(1, Math.round(size / 1024))} КБ · для восстановления на другом устройстве.</p></div><button class="btn btn-secondary" data-export>JSON</button></div><div class="settings-row settings-row-secure"><div class="settings-icon">⌑</div><div><h3>Зашифрованная копия</h3><p>Перенос между iPhone и Windows с паролем. Файл нельзя прочитать без него.</p></div><button class="btn btn-primary" data-export-encrypted>Зашифровать</button></div><div class="settings-row"><div class="settings-icon">≡</div><div><h3>Читаемый архив</h3><p>Все сны, мысли, ответы и дневниковые записи — одним Markdown-файлом.</p></div><button class="btn btn-secondary" data-export-text>TXT</button></div><div class="settings-row"><div class="settings-icon">⇧</div><div><h3>Восстановить копию</h3><p>Поддерживает обычный и зашифрованный файл. Данные на этом устройстве будут заменены.</p></div><button class="btn btn-secondary" data-import>Выбрать</button></div></div></section><section class="card"><h2>Профиль и цели</h2><form id="profile-form" class="form-grid"><div class="field"><label for="profile-name">Как вас называть</label><input id="profile-name" name="name" value="${esc(state.profile.name)}" placeholder="Имя"></div><div class="field"><label for="sleep-goal">Цель сна, часов</label><input id="sleep-goal" name="sleepGoal" type="number" min="4" max="12" step="0.5" value="${state.profile.sleepGoal}"></div><div class="form-actions field full"><button class="btn btn-primary" type="submit">Сохранить</button></div></form></section></div><aside class="stack"><section class="card data-vault-card"><div class="eyebrow">Содержимое сейфа</div><h2>Всё ваше — переносимо</h2><div class="vault-stats"><div><b>${counts.dreams}</b><span>снов</span></div><div><b>${counts.journals}</b><span>дневников</span></div><div><b>${counts.reflections}</b><span>ответов</span></div><div><b>${counts.practices + counts.workouts}</b><span>практик</span></div></div><p class="muted">Текстовые записи и голосовые заметки входят в полную копию. Зашифрованный вариант лучше для переноса.</p></section><section class="card"><h2>Перенос без облака</h2><p class="muted" style="font-size:11px;line-height:1.6">Скачайте зашифрованный файл, перенесите его любым удобным способом и восстановите на втором устройстве. Пароль не сохраняется и не восстанавливается нами.</p></section><section class="card"><h2>Чистый лист</h2><p class="muted" style="font-size:11px;line-height:1.6">Удалит все записи на этом устройстве. Сначала скачайте резервную копию.</p><button class="btn btn-danger" data-reset>Удалить все данные</button></section></aside></div>
     </div>`;
   }
 
@@ -863,7 +863,7 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
 
   const apiConnectionForm = {
     head: modalHead('Подключить ИИ-сервер', 'Введите только HTTPS-адрес сервера и личный токен. Ключ OpenAI никогда не вводится в PWA и не сохраняется в GitHub.'),
-    body: `<form id="api-connection-form" class="form-grid"><div class="field full"><label for="api-url">HTTPS-адрес сервера</label><input id="api-url" name="url" type="url" value="${esc(localStorage.getItem('rhythm-api-url') || globalThis.RHYTHM_API_URL || '')}" placeholder="https://rhythm-ai.your-name.workers.dev" autocomplete="url" required></div><div class="field full"><label for="api-token">Личный токен устройства</label><input id="api-token" name="token" type="password" value="${esc(localStorage.getItem('rhythm-api-token') || '')}" placeholder="Токен, заданный на сервере" autocomplete="off" minlength="16" required></div><p class="form-note field full">Адрес и токен остаются только в локальном хранилище этого устройства. На iPhone и Windows их нужно добавить отдельно. Если потеряете токен — создайте новый в настройках сервера.</p>${formActions('Сохранить подключение')}</form>`
+    body: `<form id="api-connection-form" class="form-grid"><div class="field full"><label for="api-url">Адрес сервера</label><input id="api-url" name="url" type="url" value="${esc(localStorage.getItem('rhythm-api-url') || globalThis.RHYTHM_API_URL || '')}" placeholder="${localSameOriginAllowed() ? 'Оставьте пустым для этого localhost' : 'https://rhythm-ai.your-name.workers.dev'}" autocomplete="url"></div><div class="field full"><label for="api-token">Личный токен устройства</label><input id="api-token" name="token" type="password" value="${esc(localStorage.getItem('rhythm-api-token') || '')}" placeholder="Токен, заданный на сервере" autocomplete="off" minlength="16"></div><p class="form-note field full">Для локального запуска на этом же localhost адрес можно оставить пустым. Для GitHub Pages нужен HTTPS-адрес Worker и личный токен. Данные подключения остаются только в этом браузере.</p><p id="api-connection-status" class="form-note field full" hidden></p><div class="form-actions field full"><button type="button" class="btn btn-secondary" data-api-test>Проверить</button><button type="submit" class="btn btn-primary">Сохранить подключение</button></div></form>`
   };
 
   const setupForm = {
@@ -998,6 +998,71 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
 
   function formData(form) { return Object.fromEntries(new FormData(form).entries()); }
 
+  function localSameOriginAllowed() {
+    return ['localhost', '127.0.0.1'].includes(globalThis.location?.hostname);
+  }
+
+  function readApiConnectionHealth() {
+    try { return JSON.parse(localStorage.getItem('rhythm-api-health') || 'null'); }
+    catch { return null; }
+  }
+
+  function aiServerSummary() {
+    if (!aiServerReady()) return 'Пока не подключён. Ключ OpenAI никогда не вводится в PWA.';
+    const health = readApiConnectionHealth();
+    const ai = health?.ai || {};
+    if (ai.textConfigured) {
+      const speech = ai.speechConfigured ? 'голос тоже готов' : 'только текст';
+      return `Подключён ${esc(ai.textProvider || 'ИИ-сервер')} · ${esc(ai.textModel || 'модель')} · ${speech}.`;
+    }
+    if (health) return 'Сервер отвечает, но текстовый ИИ ещё не настроен.';
+    return localSameOriginAllowed() ? 'Локальный сервер доступен на этом устройстве. Проверьте статус в подключении.' : 'Подключение сохранено. Проверьте сервер перед первым ИИ-запросом.';
+  }
+
+  function apiConnectionBase(form) {
+    return String(form.querySelector('[name="url"]')?.value || '').trim().replace(/\/$/, '');
+  }
+
+  function renderApiConnectionStatus(form, message, variant = 'info') {
+    const status = form.querySelector('#api-connection-status');
+    if (!status) return;
+    status.hidden = false;
+    status.className = `form-note field full api-status-${variant}`;
+    status.innerHTML = message;
+  }
+
+  async function checkApiConnection(form) {
+    const base = apiConnectionBase(form);
+    const token = String(form.querySelector('[name="token"]')?.value || '').trim();
+    const sameOrigin = base === '' && localSameOriginAllowed();
+    if (!sameOrigin && !/^https:\/\//i.test(base)) throw new Error('Нужен HTTPS-адрес сервера или локальный запуск на localhost');
+    if (!sameOrigin && token.length < 16) throw new Error('Введите полный личный токен устройства');
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(`${base}/api/health`, { headers });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok !== true) throw new Error(payload.message || 'Сервер не ответил как API «Ритма»');
+    return { base, token, payload };
+  }
+
+  function rememberApiHealth(base, payload) {
+    localStorage.setItem('rhythm-api-health', JSON.stringify({ checkedAt: new Date().toISOString(), url: base || 'same-origin', ai: payload.ai || {} }));
+  }
+
+  async function testApiConnection(form) {
+    renderApiConnectionStatus(form, 'Проверяю подключение…');
+    try {
+      const { base, payload } = await checkApiConnection(form);
+      rememberApiHealth(base, payload);
+      const ai = payload.ai || {};
+      const text = ai.textConfigured ? `текст: ${esc(ai.textProvider || 'провайдер')} · ${esc(ai.textModel || 'модель')}` : 'текстовый ИИ не настроен';
+      const speech = ai.speechConfigured ? 'голосовые функции доступны' : 'голосовая расшифровка и озвучка не настроены';
+      renderApiConnectionStatus(form, `Подключение отвечает. ${text}. ${speech}.`, ai.textConfigured ? 'success' : 'warning');
+    } catch (error) {
+      renderApiConnectionStatus(form, `${esc(error.message || 'Не удалось проверить сервер')}. Проверьте адрес, CORS и токен.`, 'error');
+    }
+  }
+
   document.addEventListener('click', async (event) => {
     const nav = event.target.closest('[data-nav]');
     if (nav) { event.preventDefault(); navigate(nav.dataset.nav); return; }
@@ -1006,6 +1071,8 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     if (modal) { openModal(modal.dataset.modal); return; }
     if (event.target.closest('[data-voice-record]')) { toggleVoiceRecording(); return; }
     if (event.target.closest('[data-assistant-record]')) { toggleAssistantRecording(); return; }
+    const apiTest = event.target.closest('[data-api-test]');
+    if (apiTest) { const form = apiTest.closest('form'); if (form) await testApiConnection(form); return; }
     if (event.target.closest('[data-statistics-ai]')) {
       const consent = document.querySelector('[data-statistics-consent]');
       const result = document.querySelector('#statistics-ai-result');
@@ -1154,12 +1221,18 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     event.preventDefault();
     const data = formData(event.target);
     if (event.target.id === 'api-connection-form') {
-      const url = data.url.trim().replace(/\/$/, '');
-      if (!/^https:\/\//i.test(url)) { toast('Нужен защищённый HTTPS-адрес сервера'); return; }
-      if (data.token.trim().length < 16) { toast('Введите полный личный токен устройства'); return; }
-      localStorage.setItem('rhythm-api-url', url);
-      localStorage.setItem('rhythm-api-token', data.token.trim());
-      saveState('ИИ-сервер подключён на этом устройстве'); closeModal(); renderSettings();
+      try {
+        const { base, token, payload } = await checkApiConnection(event.target);
+        if (base) localStorage.setItem('rhythm-api-url', base);
+        else localStorage.removeItem('rhythm-api-url');
+        if (token) localStorage.setItem('rhythm-api-token', token);
+        else localStorage.removeItem('rhythm-api-token');
+        rememberApiHealth(base, payload);
+        saveState(payload.ai?.textConfigured ? 'ИИ-сервер подключён на этом устройстве' : 'Сервер сохранён, но текстовый ИИ ещё не настроен');
+        closeModal(); renderSettings();
+      } catch (error) {
+        toast(error.message || 'Не удалось проверить ИИ-сервер');
+      }
     } else if (event.target.id === 'meditation-media-form') {
       const file = event.target.querySelector('[name="file"]')?.files?.[0];
       if (!file) { toast('Выберите аудио или видео'); return; }

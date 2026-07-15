@@ -1,4 +1,4 @@
-const CACHE = 'rhythm-shell-v12';
+const CACHE = 'rhythm-shell-v13';
 const ASSETS = ['./', './index.html', './styles.css', './config.js', './app.js', './js/core.js', './js/audio-store.js', './js/backup-crypto.js', './js/api-client.js', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))); self.clients.claim(); });

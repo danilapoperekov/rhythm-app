@@ -229,6 +229,9 @@ h3 { font-size: 15px; margin-bottom: 8px; }
 .field label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .field input, .field textarea, .field select { width: 100%; border: 1px solid var(--line); background: white; color: var(--ink); border-radius: 12px; padding: 12px 13px; }
 .field textarea { min-height: 100px; resize: vertical; line-height: 1.55; }
+.api-status-success { border-left: 3px solid #6d9b58; padding-left: 12px; }
+.api-status-warning { border-left: 3px solid var(--yellow); padding-left: 12px; }
+.api-status-error { border-left: 3px solid var(--danger); padding-left: 12px; }
 .range-wrap { display: flex; align-items: center; gap: 12px; }
 .range-wrap input { padding: 0; accent-color: var(--green); }
 .range-value { min-width: 35px; text-align: center; font-weight: 700; }

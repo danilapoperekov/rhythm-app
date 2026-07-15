@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - worker.mjs
+      - js/llm-utils.js
       - wrangler.toml
       - .github/workflows/cloudflare-worker.yml
 

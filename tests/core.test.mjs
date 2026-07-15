@@ -4,8 +4,23 @@ import { webcrypto } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { clampScale, normalizeCaptureProposal, normalizeLocalState, splitTextForAnalysis, validBackup } from '../js/core.js';
 import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from '../js/backup-crypto.js';
+import { aiServerReady, apiFetch } from '../js/api-client.js';
+import { extractJsonText, jsonOnlyInstructions, openAICompatibleChatUrl } from '../js/llm-utils.js';
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
+
+function setupApiClient({ host = 'localhost', url = '', token = '' } = {}) {
+  const values = new Map();
+  if (url) values.set('rhythm-api-url', url);
+  if (token) values.set('rhythm-api-token', token);
+  globalThis.location = { hostname: host };
+  globalThis.RHYTHM_API_URL = '';
+  globalThis.localStorage = {
+    getItem(key) { return values.get(key) || ''; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); }
+  };
+}
 
 test('archive text is split without losing content', () => {
   const text = 'a'.repeat(51); const chunks = splitTextForAnalysis(text, 20);
@@ -47,10 +62,48 @@ test('encrypted backup needs the right passphrase to restore data', async () => 
   await assert.rejects(() => decryptEncryptedBackup(encrypted, 'не тот пароль'));
 });
 
+test('local AI server calls same-origin API without requiring a token', async () => {
+  setupApiClient({ host: 'localhost' });
+  let requestedUrl = '';
+  globalThis.fetch = async (url, options) => {
+    requestedUrl = url;
+    assert.equal(options.headers.has('Authorization'), false);
+    return new Response('{}', { status: 200 });
+  };
+  assert.equal(aiServerReady(), true);
+  await apiFetch('/api/health');
+  assert.equal(requestedUrl, '/api/health');
+});
+
+test('remote AI server requires explicit URL and bearer token', async () => {
+  setupApiClient({ host: 'rhythm.example' });
+  assert.equal(aiServerReady(), false);
+  await assert.rejects(() => apiFetch('/api/health'), /AI_SERVER_NOT_CONNECTED/);
+
+  setupApiClient({ host: 'rhythm.example', url: 'https://worker.example/', token: 'personal-secret-token' });
+  let requestedUrl = '';
+  globalThis.fetch = async (url, options) => {
+    requestedUrl = url;
+    assert.equal(options.headers.get('Authorization'), 'Bearer personal-secret-token');
+    return new Response('{}', { status: 200 });
+  };
+  assert.equal(aiServerReady(), true);
+  await apiFetch('/api/health');
+  assert.equal(requestedUrl, 'https://worker.example/api/health');
+});
+
+test('OpenAI-compatible LLM helpers normalize chat URLs and JSON text', () => {
+  assert.equal(openAICompatibleChatUrl('http://127.0.0.1:8080'), 'http://127.0.0.1:8080/v1/chat/completions');
+  assert.equal(openAICompatibleChatUrl('https://router.huggingface.co/v1/'), 'https://router.huggingface.co/v1/chat/completions');
+  assert.equal(extractJsonText('```json\n{"ok":true}\n```'), '{"ok":true}');
+  assert.equal(extractJsonText('Ответ:\n{"ok":true}\nготово'), '{"ok":true}');
+  assert.ok(jsonOnlyInstructions('Сделай коротко', 'rhythm_test').includes('только валидный JSON'));
+});
+
 test('every interactive control has a declared action contract', async () => {
   const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
   const controls = {
-    'data-nav': "closest('[data-nav]')", 'data-modal': "closest('[data-modal]')", 'data-voice-record': "closest('[data-voice-record]')", 'data-assistant-record': "closest('[data-assistant-record]')",
+    'data-nav': "closest('[data-nav]')", 'data-modal': "closest('[data-modal]')", 'data-voice-record': "closest('[data-voice-record]')", 'data-assistant-record': "closest('[data-assistant-record]')", 'data-api-test': "closest('[data-api-test]')",
     'data-assistant-retry': "closest('[data-assistant-retry]')", 'data-assistant-save-inbox': "closest('[data-assistant-save-inbox]')", 'data-assistant-save': "closest('[data-assistant-save]')",
     'data-play-audio': "closest('[data-play-audio]')", 'data-add-exercise': "closest('[data-add-exercise]')", 'data-remove-exercise': "closest('[data-remove-exercise]')",
     'data-meditation-duration': "closest('[data-meditation-duration]')", 'data-meditation-toggle': "closest('[data-meditation-toggle]')", 'data-meditation-quick': "closest('[data-meditation-quick]')",

@@ -6,3 +6,4 @@ workers_dev = true
 [vars]
 RHYTHM_ALLOWED_ORIGINS = "https://danilapoperekov.github.io"
 RHYTHM_AI_MODEL = "gpt-5.6-terra"
+RHYTHM_LLM_PROVIDER = "openai"
