@@ -43,8 +43,9 @@ test('local media library survives state migration without touching file blobs',
   const initial = { profile: { aiContext: { share: false } }, habits: [], tasks: [], meditationLibrary: [] };
   const media = { id: 'media-1', title: 'Моя практика', audioId: 'audio-1', sourceName: 'practice.m4a' };
   const state = normalizeLocalState({ meditationLibrary: [media] }, initial);
-  assert.deepEqual(state.meditationLibrary, [media]);
   assert.equal(state.meditationLibrary[0].audioId, 'audio-1');
+  assert.equal(state.meditationLibrary[0].sourceName, 'practice.m4a');
+  assert.equal(state.meditationLibrary[0].text, '');
 });
 
 test('setup preferences remain local during state migration', () => {
@@ -58,11 +59,35 @@ test('setup preferences remain local during state migration', () => {
 test('state migration repairs incomplete nested records before rendering', () => {
   const initial = { profile: { aiContext: { share: false } }, sleeps: { seed: { date: 'seed', hours: 8 } }, checkins: {}, habits: [], tasks: [] };
   const state = normalizeLocalState({ profile: 'bad', sleeps: null, checkins: [], habits: [{ id: 'h1', name: 'Water' }], tasks: [{ id: 't1', title: 'Plan' }] }, initial);
-  assert.deepEqual(state.sleeps, initial.sleeps);
+  assert.equal(state.sleeps.seed.hours, 8);
+  assert.equal(state.sleeps.seed.note, '');
   assert.deepEqual(state.checkins, {});
   assert.deepEqual(state.habits[0].dates, []);
   assert.equal(state.tasks[0].time, '');
   assert.equal(state.tasks[0].category, 'self');
+});
+
+test('state migration removes malformed records from every rendered collection', () => {
+  const initial = { profile: { aiContext: { share: false } }, sleeps: {}, checkins: {}, habits: [], tasks: [] };
+  const state = normalizeLocalState({
+    sleeps: { broken: null, valid: { hours: '7.5' } },
+    checkins: { broken: 'nope', valid: { energy: 8, emotions: 'bad' } },
+    dreams: [null, 'bad', { date: '2026-07-15', tags: 'bad' }],
+    journals: [null, { text: 42 }], reflections: ['bad', { answer: 42 }], meditations: [null, { duration: '12' }],
+    workouts: ['bad', { exercises: [null, { title: 'Walk' }] }], captures: [null, { proposals: [{ kind: 'task' }] }],
+    inbox: ['bad', { title: 42 }], meditationLibrary: [null, { text: 42, duration: 0 }]
+  }, initial);
+  assert.deepEqual(Object.keys(state.sleeps), ['valid']);
+  assert.equal(state.sleeps.valid.hours, 7.5);
+  assert.deepEqual(Object.keys(state.checkins), ['valid']);
+  assert.equal(state.checkins.valid.energy, 8);
+  assert.equal(state.dreams.length, 1);
+  assert.deepEqual(state.dreams[0].tags, []);
+  assert.equal(state.journals[0].text, '42');
+  assert.equal(state.reflections[0].answer, '42');
+  assert.equal(state.workouts[0].exercises.length, 1);
+  assert.equal(state.captures[0].proposals[0].kind, 'task');
+  assert.equal(state.meditationLibrary[0].duration, 1);
 });
 
 test('state store uses localStorage fallback when IndexedDB is unavailable', async () => {
@@ -128,6 +153,18 @@ test('remote AI server requires explicit URL and bearer token', async () => {
   assert.equal(aiServerReady(), true);
   await apiFetch('/api/health');
   assert.equal(requestedUrl, 'https://worker.example/api/health');
+});
+
+test('hosted AI worker exposes a protected health check for the PWA', async () => {
+  const worker = (await import('../worker.mjs')).default;
+  const url = 'https://rhythm-ai.example.workers.dev/api/health';
+  const env = { RHYTHM_ACCESS_TOKEN: 'personal-secret-token', OPENAI_API_KEY: 'sk-test', RHYTHM_ALLOWED_ORIGINS: 'https://danilapoperekov.github.io' };
+  const response = await worker.fetch(new Request(url, { headers: { Origin: 'https://danilapoperekov.github.io', Authorization: 'Bearer personal-secret-token' } }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://danilapoperekov.github.io');
+  assert.equal(body.ai.textConfigured, true);
+  assert.equal(body.ai.speechConfigured, true);
 });
 
 test('OpenAI-compatible LLM helpers normalize chat URLs and JSON text', () => {

@@ -832,14 +832,23 @@ import { clearStoredState, loadStoredState, saveStoredState } from './js/state-s
 
   const renderers = { today: renderToday, calendar: renderCalendar, sleep: renderSleep, habits: renderHabits, journal: renderJournal, practice: renderPractice, insights: renderInsights, statistics: renderStatistics, settings: renderSettings };
 
+  function renderRecovery(view, error) {
+    console.error(`Не удалось открыть вкладку ${view}`, error);
+    app.innerHTML = `<div class="page"><section class="card recovery-card"><div class="eyebrow">Вкладка временно недоступна</div><h1>Данные остались на устройстве</h1><p class="muted">Попробуйте открыть экран ещё раз. Если проблема повторится, в «Настройках» можно скачать резервную копию.</p><div class="form-actions"><button class="btn btn-secondary" data-nav="today">На главную</button><button class="btn btn-primary" data-nav="${esc(view)}">Повторить</button></div></section></div>`;
+  }
+
   function navigate(view) {
     currentView = renderers[view] ? view : 'today';
     history.replaceState(null, '', `#${currentView}`);
     document.querySelectorAll('[data-nav]').forEach((el) => el.classList.toggle('active', el.dataset.nav === currentView));
-    renderers[currentView]();
-    if (currentView === 'practice') { renderMeditationLibrary(); renderMeditationExtras(); }
-    if (currentView === 'journal') renderDreamAnalysisPanel();
-    if (currentView === 'settings') renderInstallCard();
+    try {
+      renderers[currentView]();
+      if (currentView === 'practice') { renderMeditationLibrary(); renderMeditationExtras(); }
+      if (currentView === 'journal') renderDreamAnalysisPanel();
+      if (currentView === 'settings') renderInstallCard();
+    } catch (error) {
+      renderRecovery(currentView, error);
+    }
     app.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
