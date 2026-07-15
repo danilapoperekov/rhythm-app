@@ -6,6 +6,7 @@ import { clampScale, normalizeCaptureProposal, normalizeLocalState, splitTextFor
 import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from '../js/backup-crypto.js';
 import { aiServerReady, apiFetch } from '../js/api-client.js';
 import { extractJsonText, jsonOnlyInstructions, openAICompatibleChatUrl } from '../js/llm-utils.js';
+import { clearStoredState, loadStoredState, saveStoredState } from '../js/state-store.js';
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -52,6 +53,33 @@ test('setup preferences remain local during state migration', () => {
   assert.equal(state.profile.onboardingDone, true);
   assert.equal(state.profile.aiContext.share, false);
   assert.equal(state.profile.aiContext.goals, 'Больше сна');
+});
+
+test('state store uses localStorage fallback when IndexedDB is unavailable', async () => {
+  const previousIndexedDb = globalThis.indexedDB;
+  const previousLocalStorage = globalThis.localStorage;
+  const values = new Map();
+  delete globalThis.indexedDB;
+  globalThis.localStorage = {
+    getItem(key) { return values.get(key) || ''; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); }
+  };
+
+  try {
+    const saved = await saveStoredState('rhythm-test-state', { habits: [], tasks: [{ id: 'one' }] });
+    const loaded = await loadStoredState('rhythm-test-state');
+    assert.equal(saved.driver, 'localStorage');
+    assert.equal(loaded.driver, 'localStorage');
+    assert.deepEqual(loaded.state.tasks, [{ id: 'one' }]);
+
+    await clearStoredState('rhythm-test-state');
+    assert.equal(values.has('rhythm-test-state'), false);
+  } finally {
+    if (previousIndexedDb === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = previousIndexedDb;
+    globalThis.localStorage = previousLocalStorage;
+  }
 });
 
 test('encrypted backup needs the right passphrase to restore data', async () => {

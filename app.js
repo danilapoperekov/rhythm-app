@@ -2,6 +2,7 @@ import { normalizeCaptureProposal, normalizeLocalState, splitTextForAnalysis, va
 import { blobToDataUrl as audioBlobToDataUrl, dataUrlToBlob as audioDataUrlToBlob, deleteAudioRecord, getAllAudioRecords, getAudioBlob, putAudioRecords, saveAudioBlob } from './js/audio-store.js';
 import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from './js/backup-crypto.js';
 import { aiServerReady, apiFetch } from './js/api-client.js';
+import { clearStoredState, loadStoredState, saveStoredState } from './js/state-store.js';
 
 (() => {
   'use strict';
@@ -118,27 +119,36 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     };
   }
 
-  function loadState() {
+  async function loadState() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? normalizeLocalState(JSON.parse(saved), createInitialState()) : createInitialState();
+      const loaded = await loadStoredState(STORAGE_KEY);
+      storageStatus = loaded;
+      return loaded.state ? normalizeLocalState(loaded.state, createInitialState()) : createInitialState();
     } catch (error) {
       console.warn('Не удалось прочитать данные', error);
       return createInitialState();
     }
   }
 
-  let state = loadState();
-  state.dreams ||= [];
-  state.reflections ||= [];
-  state.journals ||= [];
-  state.meditations ||= [];
-  state.workouts ||= [];
-  state.captures ||= [];
-  state.inbox ||= [];
-  state.meditationLibrary ||= [];
-  state.profile.aiContext ||= { tone: '', goals: '', boundaries: '', share: false };
-  state.profile.onboardingDone ||= Boolean(state.profile.name);
+  function prepareRuntimeState(next) {
+    const prepared = next && typeof next === 'object' ? next : createInitialState();
+    prepared.profile ||= { name: '', sleepGoal: 8, onboardingDone: false, aiContext: { tone: '', goals: '', boundaries: '', share: false } };
+    prepared.dreams ||= [];
+    prepared.reflections ||= [];
+    prepared.journals ||= [];
+    prepared.meditations ||= [];
+    prepared.workouts ||= [];
+    prepared.captures ||= [];
+    prepared.inbox ||= [];
+    prepared.meditationLibrary ||= [];
+    prepared.profile.aiContext ||= { tone: '', goals: '', boundaries: '', share: false };
+    prepared.profile.onboardingDone ||= Boolean(prepared.profile.name);
+    return prepared;
+  }
+
+  let storageStatus = { driver: 'loading', migrated: false };
+  let state = prepareRuntimeState(createInitialState());
+  let pendingStateWrite = Promise.resolve();
   let meditationSeconds = 600;
   let meditationSessionSeconds = 600;
   let meditationTimer = null;
@@ -151,9 +161,20 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
   let assistantChunks = [];
   let assistantDiscarding = false;
 
+  function snapshotState() {
+    if (typeof structuredClone === 'function') return structuredClone(state);
+    return JSON.parse(JSON.stringify(state));
+  }
+
   function saveState(message) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const snapshot = snapshotState();
+    pendingStateWrite = pendingStateWrite
+      .catch(() => {})
+      .then(() => saveStoredState(STORAGE_KEY, snapshot))
+      .then((result) => { storageStatus = { ...storageStatus, ...result }; })
+      .catch((error) => console.warn('Не удалось сохранить данные', error));
     if (message) toast(message);
+    return pendingStateWrite;
   }
 
   function aiContextText() {
@@ -627,6 +648,12 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     </div>`;
   }
 
+  function storageBadge() {
+    if (storageStatus.driver === 'indexedDB') return storageStatus.migrated ? 'IndexedDB · перенесено' : 'IndexedDB';
+    if (storageStatus.driver === 'localStorage') return storageStatus.fallback ? 'localStorage · fallback' : 'localStorage';
+    return 'загрузка';
+  }
+
   function renderSettings() {
     const size = new Blob([JSON.stringify(state)]).size;
     const counts = {
@@ -638,7 +665,7 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     };
     app.innerHTML = `<div class="page">
       ${pageHeader('Под вашим контролем', 'Настройки', 'Приватность, перенос данных и будущие подключения.', '')}
-      <div class="grid dashboard-grid"><div class="stack"><section class="card"><div class="card-head"><div><div class="eyebrow">Локальный сейф</div><h2>Ваши данные</h2></div><span class="badge">на устройстве</span></div><div class="settings-list"><div class="settings-row"><div class="settings-icon">⌂</div><div><h3>Локальное хранение</h3><p>Записи остаются в этом браузере даже без интернета. В ИИ ничего не отправляется автоматически.</p></div><span class="badge">активно</span></div><div class="settings-row settings-row-secure"><div class="settings-icon">✦</div><div><h3>ИИ-сервер</h3><p>${aiServerSummary()}</p></div><button class="btn ${aiServerReady() ? 'btn-secondary' : 'btn-primary'}" data-modal="apiConnection">${aiServerReady() ? 'Изменить' : 'Подключить'}</button></div><div class="settings-row"><div class="settings-icon">⇩</div><div><h3>Полная резервная копия</h3><p>${Math.max(1, Math.round(size / 1024))} КБ · для восстановления на другом устройстве.</p></div><button class="btn btn-secondary" data-export>JSON</button></div><div class="settings-row settings-row-secure"><div class="settings-icon">⌑</div><div><h3>Зашифрованная копия</h3><p>Перенос между iPhone и Windows с паролем. Файл нельзя прочитать без него.</p></div><button class="btn btn-primary" data-export-encrypted>Зашифровать</button></div><div class="settings-row"><div class="settings-icon">≡</div><div><h3>Читаемый архив</h3><p>Все сны, мысли, ответы и дневниковые записи — одним Markdown-файлом.</p></div><button class="btn btn-secondary" data-export-text>TXT</button></div><div class="settings-row"><div class="settings-icon">⇧</div><div><h3>Восстановить копию</h3><p>Поддерживает обычный и зашифрованный файл. Данные на этом устройстве будут заменены.</p></div><button class="btn btn-secondary" data-import>Выбрать</button></div></div></section><section class="card"><h2>Профиль и цели</h2><form id="profile-form" class="form-grid"><div class="field"><label for="profile-name">Как вас называть</label><input id="profile-name" name="name" value="${esc(state.profile.name)}" placeholder="Имя"></div><div class="field"><label for="sleep-goal">Цель сна, часов</label><input id="sleep-goal" name="sleepGoal" type="number" min="4" max="12" step="0.5" value="${state.profile.sleepGoal}"></div><div class="form-actions field full"><button class="btn btn-primary" type="submit">Сохранить</button></div></form></section></div><aside class="stack"><section class="card data-vault-card"><div class="eyebrow">Содержимое сейфа</div><h2>Всё ваше — переносимо</h2><div class="vault-stats"><div><b>${counts.dreams}</b><span>снов</span></div><div><b>${counts.journals}</b><span>дневников</span></div><div><b>${counts.reflections}</b><span>ответов</span></div><div><b>${counts.practices + counts.workouts}</b><span>практик</span></div></div><p class="muted">Текстовые записи и голосовые заметки входят в полную копию. Зашифрованный вариант лучше для переноса.</p></section><section class="card"><h2>Перенос без облака</h2><p class="muted" style="font-size:11px;line-height:1.6">Скачайте зашифрованный файл, перенесите его любым удобным способом и восстановите на втором устройстве. Пароль не сохраняется и не восстанавливается нами.</p></section><section class="card"><h2>Чистый лист</h2><p class="muted" style="font-size:11px;line-height:1.6">Удалит все записи на этом устройстве. Сначала скачайте резервную копию.</p><button class="btn btn-danger" data-reset>Удалить все данные</button></section></aside></div>
+      <div class="grid dashboard-grid"><div class="stack"><section class="card"><div class="card-head"><div><div class="eyebrow">Локальный сейф</div><h2>Ваши данные</h2></div><span class="badge">на устройстве</span></div><div class="settings-list"><div class="settings-row"><div class="settings-icon">⌂</div><div><h3>Локальное хранение</h3><p>Записи остаются в этом браузере даже без интернета. В ИИ ничего не отправляется автоматически.</p></div><span class="badge">${storageBadge()}</span></div><div class="settings-row settings-row-secure"><div class="settings-icon">✦</div><div><h3>ИИ-сервер</h3><p>${aiServerSummary()}</p></div><button class="btn ${aiServerReady() ? 'btn-secondary' : 'btn-primary'}" data-modal="apiConnection">${aiServerReady() ? 'Изменить' : 'Подключить'}</button></div><div class="settings-row"><div class="settings-icon">⇩</div><div><h3>Полная резервная копия</h3><p>${Math.max(1, Math.round(size / 1024))} КБ · для восстановления на другом устройстве.</p></div><button class="btn btn-secondary" data-export>JSON</button></div><div class="settings-row settings-row-secure"><div class="settings-icon">⌑</div><div><h3>Зашифрованная копия</h3><p>Перенос между iPhone и Windows с паролем. Файл нельзя прочитать без него.</p></div><button class="btn btn-primary" data-export-encrypted>Зашифровать</button></div><div class="settings-row"><div class="settings-icon">≡</div><div><h3>Читаемый архив</h3><p>Все сны, мысли, ответы и дневниковые записи — одним Markdown-файлом.</p></div><button class="btn btn-secondary" data-export-text>TXT</button></div><div class="settings-row"><div class="settings-icon">⇧</div><div><h3>Восстановить копию</h3><p>Поддерживает обычный и зашифрованный файл. Данные на этом устройстве будут заменены.</p></div><button class="btn btn-secondary" data-import>Выбрать</button></div></div></section><section class="card"><h2>Профиль и цели</h2><form id="profile-form" class="form-grid"><div class="field"><label for="profile-name">Как вас называть</label><input id="profile-name" name="name" value="${esc(state.profile.name)}" placeholder="Имя"></div><div class="field"><label for="sleep-goal">Цель сна, часов</label><input id="sleep-goal" name="sleepGoal" type="number" min="4" max="12" step="0.5" value="${state.profile.sleepGoal}"></div><div class="form-actions field full"><button class="btn btn-primary" type="submit">Сохранить</button></div></form></section></div><aside class="stack"><section class="card data-vault-card"><div class="eyebrow">Содержимое сейфа</div><h2>Всё ваше — переносимо</h2><div class="vault-stats"><div><b>${counts.dreams}</b><span>снов</span></div><div><b>${counts.journals}</b><span>дневников</span></div><div><b>${counts.reflections}</b><span>ответов</span></div><div><b>${counts.practices + counts.workouts}</b><span>практик</span></div></div><p class="muted">Текстовые записи и голосовые заметки входят в полную копию. Зашифрованный вариант лучше для переноса.</p></section><section class="card"><h2>Перенос без облака</h2><p class="muted" style="font-size:11px;line-height:1.6">Скачайте зашифрованный файл, перенесите его любым удобным способом и восстановите на втором устройстве. Пароль не сохраняется и не восстанавливается нами.</p></section><section class="card"><h2>Чистый лист</h2><p class="muted" style="font-size:11px;line-height:1.6">Удалит все записи на этом устройстве. Сначала скачайте резервную копию.</p><button class="btn btn-danger" data-reset>Удалить все данные</button></section></aside></div>
     </div>`;
   }
 
@@ -1063,6 +1090,15 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     }
   }
 
+  async function resetLocalData() {
+    if (!confirm('Точно удалить все локальные записи? Это действие нельзя отменить без резервной копии.')) return;
+    await clearStoredState(STORAGE_KEY);
+    state = prepareRuntimeState(createInitialState());
+    state.preferences.demo = false;
+    await saveState('Данные очищены');
+    navigate('today');
+  }
+
   document.addEventListener('click', async (event) => {
     const nav = event.target.closest('[data-nav]');
     if (nav) { event.preventDefault(); navigate(nav.dataset.nav); return; }
@@ -1206,7 +1242,8 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
     if (event.target.closest('[data-export-text]')) { exportTextArchive(); return; }
     if (event.target.closest('[data-import]')) { document.querySelector('#import-file').click(); return; }
     if (event.target.closest('[data-reset]')) {
-      if (confirm('Точно удалить все локальные записи? Это действие нельзя отменить без резервной копии.')) { localStorage.removeItem(STORAGE_KEY); state = createInitialState(); state.preferences.demo = false; saveState('Данные очищены'); navigate('today'); } return;
+      await resetLocalData();
+      return;
     }
   });
 
@@ -1378,10 +1415,10 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
   async function restoreBackup(parsed) {
     const imported = parsed?.format === 'rhythm.backup' ? parsed.data : parsed;
     if (!validBackup(parsed)) throw new Error('Неверный формат');
-    state = normalizeLocalState(imported, createInitialState());
+    state = prepareRuntimeState(normalizeLocalState(imported, createInitialState()));
     state.captures ||= []; state.inbox ||= [];
     if (Array.isArray(parsed?.audio) && parsed.audio.length) await putVoiceRecordings(parsed.audio.filter((record) => record?.id && record?.dataUrl).map((record) => ({ id: record.id, createdAt: record.createdAt || new Date().toISOString(), blob: dataUrlToBlob(record.dataUrl) })));
-    saveState('Данные восстановлены'); navigate('today');
+    await saveState('Данные восстановлены'); navigate('today');
   }
 
   function exportTextArchive() {
@@ -1421,6 +1458,15 @@ import { aiServerReady, apiFetch } from './js/api-client.js';
   window.addEventListener('hashchange', () => navigate(location.hash.replace('#', '') || 'today'));
 
   window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); deferredInstallPrompt = event; });
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-  navigate(currentView);
+  async function initializeApp() {
+    state = prepareRuntimeState(await loadState());
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    navigate(currentView);
+  }
+
+  initializeApp().catch((error) => {
+    console.warn('Не удалось запустить приложение', error);
+    state = prepareRuntimeState(createInitialState());
+    navigate(currentView);
+  });
 })();
