@@ -2,6 +2,7 @@ const DB_NAME = 'rhythm-state-v1';
 const DB_VERSION = 1;
 const STORE = 'snapshots';
 const MIGRATED_SUFFIX = ':indexeddb-migrated';
+const OPEN_TIMEOUT_MS = 1500;
 
 function hasLocalStorage() {
   return typeof localStorage !== 'undefined';
@@ -50,19 +51,32 @@ function markMigrated(key) {
 
 function openDb() {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('indexeddb_open_timeout'));
+      }
+    }, OPEN_TIMEOUT_MS);
+    const finish = (callback) => (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      callback(value);
+    };
     let request;
     try {
       request = indexedDB.open(DB_NAME, DB_VERSION);
     } catch (error) {
-      reject(error);
+      finish(reject)(error);
       return;
     }
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' });
     };
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => finish(reject)(request.error);
+    request.onsuccess = () => finish(resolve)(request.result);
   });
 }
 

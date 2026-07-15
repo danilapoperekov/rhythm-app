@@ -2,7 +2,7 @@ import { normalizeCaptureProposal, normalizeLocalState, splitTextForAnalysis, va
 import { blobToDataUrl as audioBlobToDataUrl, dataUrlToBlob as audioDataUrlToBlob, deleteAudioRecord, getAllAudioRecords, getAudioBlob, putAudioRecords, saveAudioBlob } from './js/audio-store.js';
 import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from './js/backup-crypto.js';
 import { aiServerReady, apiFetch } from './js/api-client.js';
-import { clearStoredState, loadStoredState, saveStoredState } from './js/state-store.js';
+import { clearStoredState, loadStoredState, saveStoredState } from './js/state-store.js?v=16';
 
 (() => {
   'use strict';
