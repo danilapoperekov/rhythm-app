@@ -55,6 +55,16 @@ test('setup preferences remain local during state migration', () => {
   assert.equal(state.profile.aiContext.goals, 'Больше сна');
 });
 
+test('state migration repairs incomplete nested records before rendering', () => {
+  const initial = { profile: { aiContext: { share: false } }, sleeps: { seed: { date: 'seed', hours: 8 } }, checkins: {}, habits: [], tasks: [] };
+  const state = normalizeLocalState({ profile: 'bad', sleeps: null, checkins: [], habits: [{ id: 'h1', name: 'Water' }], tasks: [{ id: 't1', title: 'Plan' }] }, initial);
+  assert.deepEqual(state.sleeps, initial.sleeps);
+  assert.deepEqual(state.checkins, {});
+  assert.deepEqual(state.habits[0].dates, []);
+  assert.equal(state.tasks[0].time, '');
+  assert.equal(state.tasks[0].category, 'self');
+});
+
 test('state store uses localStorage fallback when IndexedDB is unavailable', async () => {
   const previousIndexedDb = globalThis.indexedDB;
   const previousLocalStorage = globalThis.localStorage;

@@ -27,14 +27,49 @@ export function normalizeCaptureProposal(proposal = {}) {
   };
 }
 
+function objectMap(value, fallback = {}) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : fallback;
+}
+
+function normalizeHabits(value, fallback = []) {
+  const source = Array.isArray(value) ? value : fallback;
+  return source.filter((habit) => habit && typeof habit === 'object').map((habit, index) => ({
+    ...habit,
+    id: String(habit.id || `habit-${index}`),
+    name: String(habit.name || 'Привычка'),
+    icon: String(habit.icon || '✦'),
+    color: String(habit.color || '#dce8d2'),
+    goal: String(habit.goal || ''),
+    dates: Array.isArray(habit.dates) ? habit.dates.map(String) : []
+  }));
+}
+
+function normalizeTasks(value, fallback = []) {
+  const source = Array.isArray(value) ? value : fallback;
+  return source.filter((task) => task && typeof task === 'object').map((task, index) => ({
+    ...task,
+    id: String(task.id || `task-${index}`),
+    title: String(task.title || 'Задача'),
+    date: String(task.date || ''),
+    time: String(task.time || ''),
+    category: ['self', 'health', 'work'].includes(task.category) ? task.category : 'self',
+    note: String(task.note || ''),
+    done: Boolean(task.done),
+    cancelled: Boolean(task.cancelled)
+  }));
+}
+
 export function normalizeLocalState(raw, initial) {
   const value = raw && typeof raw === 'object' ? raw : {};
+  const profile = objectMap(value.profile);
   return {
     ...initial,
     ...value,
-    profile: { ...initial.profile, ...(value.profile || {}), aiContext: { ...(initial.profile?.aiContext || {}), ...(value.profile?.aiContext || {}) } },
-    habits: Array.isArray(value.habits) ? value.habits : initial.habits,
-    tasks: Array.isArray(value.tasks) ? value.tasks : initial.tasks,
+    profile: { ...initial.profile, ...profile, aiContext: { ...(initial.profile?.aiContext || {}), ...objectMap(profile.aiContext) } },
+    sleeps: objectMap(value.sleeps, initial.sleeps || {}),
+    checkins: objectMap(value.checkins, initial.checkins || {}),
+    habits: normalizeHabits(value.habits, initial.habits),
+    tasks: normalizeTasks(value.tasks, initial.tasks),
     dreams: Array.isArray(value.dreams) ? value.dreams : [],
     journals: Array.isArray(value.journals) ? value.journals : [],
     meditations: Array.isArray(value.meditations) ? value.meditations : [],
