@@ -75,13 +75,23 @@ function textAIConfigured() {
 }
 
 function healthPayload() {
+  const textConfigured = textAIConfigured();
+  const speechConfigured = Boolean(openaiApiKey);
   return {
     ok: true,
     ai: {
       textProvider,
       textModel,
-      textConfigured: textAIConfigured(),
-      speechConfigured: Boolean(openaiApiKey)
+      textConfigured,
+      speechConfigured,
+      capabilities: {
+        reflection: textConfigured,
+        archive: textConfigured,
+        meditation: textConfigured,
+        captureText: textConfigured,
+        transcription: speechConfigured,
+        meditationVoice: speechConfigured
+      }
     }
   };
 }

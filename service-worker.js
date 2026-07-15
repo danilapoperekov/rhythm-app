@@ -1,5 +1,5 @@
-const CACHE = 'rhythm-shell-v18';
-const ASSETS = ['./', './index.html', './styles.css', './config.js', './app.js?v=18', './js/core.js', './js/audio-store.js', './js/backup-crypto.js', './js/api-client.js', './js/llm-utils.js', './js/state-store.js?v=16', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'rhythm-shell-v19';
+const ASSETS = ['./', './index.html', './styles.css', './config.js', './app.js?v=19', './js/core.js', './js/audio-store.js', './js/backup-crypto.js', './js/api-client.js', './js/llm-utils.js', './js/state-store.js?v=16', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))); self.clients.claim(); });
 self.addEventListener('fetch', (event) => {

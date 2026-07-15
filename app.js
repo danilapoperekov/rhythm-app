@@ -1062,8 +1062,10 @@ import { clearStoredState, loadStoredState, saveStoredState } from './js/state-s
     const health = readApiConnectionHealth();
     const ai = health?.ai || {};
     if (ai.textConfigured) {
-      const speech = ai.speechConfigured ? 'голос тоже готов' : 'только текст';
-      return `Подключён ${esc(ai.textProvider || 'ИИ-сервер')} · ${esc(ai.textModel || 'модель')} · ${speech}.`;
+      const voiceInput = ai.capabilities?.transcription ?? ai.speechConfigured;
+      const voiceOutput = ai.capabilities?.meditationVoice ?? ai.speechConfigured;
+      const voice = voiceInput && voiceOutput ? 'голос тоже готов' : 'только текст';
+      return `Подключён ${esc(ai.textProvider || 'ИИ-сервер')} · ${esc(ai.textModel || 'модель')} · ${voice}.`;
     }
     if (health) return 'Сервер отвечает, но текстовый ИИ ещё не настроен.';
     return localSameOriginAllowed() ? 'Локальный сервер доступен на этом устройстве. Проверьте статус в подключении.' : 'Подключение сохранено. Проверьте сервер перед первым ИИ-запросом.';
@@ -1106,7 +1108,9 @@ import { clearStoredState, loadStoredState, saveStoredState } from './js/state-s
       rememberApiHealth(base, payload);
       const ai = payload.ai || {};
       const text = ai.textConfigured ? `текст: ${esc(ai.textProvider || 'провайдер')} · ${esc(ai.textModel || 'модель')}` : 'текстовый ИИ не настроен';
-      const speech = ai.speechConfigured ? 'голосовые функции доступны' : 'голосовая расшифровка и озвучка не настроены';
+      const transcription = ai.capabilities?.transcription ?? ai.speechConfigured;
+      const meditationVoice = ai.capabilities?.meditationVoice ?? ai.speechConfigured;
+      const speech = transcription && meditationVoice ? 'голосовая расшифровка и озвучка доступны' : 'текст работает, а голосовая расшифровка и озвучка требуют OpenAI-ключ на сервере';
       renderApiConnectionStatus(form, `Подключение отвечает. ${text}. ${speech}.`, ai.textConfigured ? 'success' : 'warning');
     } catch (error) {
       renderApiConnectionStatus(form, `${esc(error.message || 'Не удалось проверить сервер')}. Проверьте адрес, CORS и токен.`, 'error');

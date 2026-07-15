@@ -165,6 +165,8 @@ test('hosted AI worker exposes a protected health check for the PWA', async () =
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://danilapoperekov.github.io');
   assert.equal(body.ai.textConfigured, true);
   assert.equal(body.ai.speechConfigured, true);
+  assert.equal(body.ai.capabilities.captureText, true);
+  assert.equal(body.ai.capabilities.transcription, true);
 });
 
 test('OpenAI-compatible LLM helpers normalize chat URLs and JSON text', () => {

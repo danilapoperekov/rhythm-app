@@ -108,13 +108,23 @@ function textAIConfigured(env) {
 }
 
 function healthPayload(env) {
+  const textConfigured = textAIConfigured(env);
+  const speechConfigured = Boolean(env.OPENAI_API_KEY);
   return {
     ok: true,
     ai: {
       textProvider: textProvider(env),
       textModel: textModel(env),
-      textConfigured: textAIConfigured(env),
-      speechConfigured: Boolean(env.OPENAI_API_KEY)
+      textConfigured,
+      speechConfigured,
+      capabilities: {
+        reflection: textConfigured,
+        archive: textConfigured,
+        meditation: textConfigured,
+        captureText: textConfigured,
+        transcription: speechConfigured,
+        meditationVoice: speechConfigured
+      }
     }
   };
 }
